@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Accessibility enhancement for Windows 11</title>
+<style>
+body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+h1, h2, h3 { color: #005a9e; }
+code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>Accessibility enhancement for Windows 11 (win11_access)</h1>
+<ul>
+<li><strong>Author:</strong> Bibek</li>
+<li><strong>Version:</strong> 1.0</li>
+<li><strong>Minimum NVDA Version:</strong> 2026.1</li>
+<li><strong>Last Tested NVDA Version:</strong> 2026.3</li>
+</ul>
+<p>This NVDA add-on provides targeted accessibility enhancements for Windows 11, improving the screen reading experience across core Windows experiences.</p>
+
+<h2>Features</h2>
+
+<h3>1. Windows Search (Start Menu) Context Menu Navigation</h3>
+<ul>
+<li><strong>Issue Addressed:</strong> When searching in the Windows 11 Start Menu and opening the context menu on a search result (e.g. via Application key or Shift+F10), navigating through items with the Up or Down arrow key caused NVDA to repeatedly announce "context menu list" before every item (e.g. <em>"context menu list, open 1 of 5"</em>, <em>"context menu list, open file location 2 of 5"</em>).</li>
+<li><strong>Enhancement:</strong> The repetitive announcement of "context menu list" is suppressed while navigating menu items with Up or Down arrow keys. NVDA speaks only the relevant menu item and position (e.g. <em>"open 1 of 5"</em>, <em>"open file location 2 of 5"</em>), making browsing options faster and much easier to listen to. Context menus in other applications remain unaffected.</li>
+</ul>
+
+<h3>2. Windows Settings — Installed Apps Enhancements</h3>
+<ul>
+<li><strong>Number of Apps Found Announcement:</strong>
+<ul>
+<li>In Windows Settings under <strong>Apps &gt; Installed apps</strong>, a text label displays the total count of applications (e.g. <em>"137 apps found"</em>).</li>
+<li>When you navigate focus to the <strong>Filter by drive</strong> combo box, NVDA automatically announces the number of apps found.</li>
+</ul>
+</li>
+<li><strong>Application Size in the App List:</strong>
+<ul>
+<li>While navigating through the list of installed applications in Installed Apps, NVDA automatically announces each application's storage size (e.g. <em>"Google Chrome, 350 MB, list item, 1 of 137"</em>).</li>
+<li>You no longer need to switch to NVDA object navigation to read the app size from the table column.</li>
+</ul>
+</li>
+</ul>
+
+<h3>3. Windows Calculator Mode Announcement</h3>
+<ul>
+<li><strong>Enhancement:</strong> Upon opening the Windows 11 Calculator application, NVDA automatically announces the currently active calculation mode (e.g. <em>"Standard mode"</em>, <em>"Scientific mode"</em>, <em>"Programmer mode"</em>).</li>
+</ul>
+
+<h2>Installation</h2>
+<ol>
+<li>Download or locate <code>win11_access.nvda-addon</code>.</li>
+<li>Press <code>Enter</code> on the file or open it through the NVDA Add-ons Manager (<code>NVDA menu &gt; Tools &gt; Add-ons store / Add-ons Manager</code>).</li>
+<li>Follow the prompts to install and restart NVDA.</li>
+</ol>
+
+<h2>Requirements</h2>
+<ul>
+<li>Windows 11 (latest releases)</li>
+<li>NVDA 2026.1 to 2026.3</li>
+</ul>
+</body>
+</html>

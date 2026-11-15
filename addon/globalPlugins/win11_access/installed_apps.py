@@ -1,0 +1,352 @@
+# -*- coding: UTF-8 -*-
+# installed_apps.py
+# Enhancements for Windows 11 Settings -> Apps -> Installed apps:
+# 1. Announces the number of apps found (e.g. "137 apps found") when focusing the drive filter combo box.
+# 2. Announces the application size (e.g. "350 MB") when navigating the installed applications list.
+
+import re
+import time
+import controlTypes
+import ui
+from logHandler import log
+import NVDAObjects.UIA
+
+# Regex pattern to match "X apps found" (supporting various localized variants)
+APPS_FOUND_PATTERN = re.compile(
+    r"\b(\d+\s+(?:apps?|applications?|Programme?|éléments?|elementos|aplicaciones|applicazioni)\s*(?:found|trouvés?|trouvées?|gefunden|encontrados?|encontradas?|trovati|trovate)?)\b",
+    re.IGNORECASE,
+)
+
+# Regex pattern for standalone app storage size strings (e.g. "350 MB", "1.25 GB", "45 KB", "100 bytes")
+SIZE_REGEX = re.compile(
+    r"^\s*(\d+(?:[\.,]\d+)?\s*(?:bytes?|byte|B|KB|MB|GB|TB|PB|Ko|Mo|Go|To|КБ|МБ|ГБ|ТБ))\s*$",
+    re.IGNORECASE,
+)
+
+# Regex pattern for size embedded within other text (e.g. "Size: 350 MB")
+EMBEDDED_SIZE_REGEX = re.compile(
+    r"\b(\d+(?:[\.,]\d+)?\s*(?:bytes?|byte|KB|MB|GB|TB|PB|Ko|Mo|Go|To|КБ|МБ|ГБ|ТБ))\b",
+    re.IGNORECASE,
+)
+
+# Prevent repetitive duplicate announcements if focus rapidly bounces
+_lastAnnouncedAppsFound = None
+_lastAnnouncedTime = 0.0
+
+
+def isSettingsApp(obj):
+    """Checks whether the object belongs to Windows Settings (SystemSettings.exe)."""
+    if not obj:
+        return False
+    try:
+        appModule = getattr(obj, "appModule", None)
+        appName = (getattr(appModule, "appName", None) or "").lower()
+        return appName == "systemsettings"
+    except Exception:
+        return False
+
+
+def isDriveFilterComboBox(obj):
+    """
+    Checks whether the object is the drive filter combo box in Installed apps.
+    Usually named "Filter by drive", "All drives", "Drive", or has automation ID
+    containing "drive" or "filter".
+    """
+    try:
+        if not isSettingsApp(obj):
+            return False
+        if getattr(obj, "role", None) != controlTypes.Role.COMBOBOX:
+            return False
+
+        name = (getattr(obj, "name", "") or "").lower()
+        autoId = ""
+        if isinstance(obj, getattr(NVDAObjects.UIA, "UIA", tuple())):
+            try:
+                autoId = (getattr(obj, "UIAAutomationId", "") or "").lower()
+            except Exception:
+                autoId = ""
+
+        if any(k in name for k in ("drive", "drives", "all drives")):
+            return True
+        if any(k in autoId for k in ("drive", "filterbydrive", "drivefilter")):
+            return True
+        if "filter" in name and "sort" not in name:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def findAppsFoundText(obj):
+    """
+    Locates the "X apps found" text element located near the drive filter combo box.
+    Inspects previous siblings, parent siblings, and nearby containers.
+    """
+    # 1. Check previous element directly
+    try:
+        prev = getattr(obj, "previous", None)
+        if prev:
+            pname = getattr(prev, "name", "") or ""
+            m = APPS_FOUND_PATTERN.search(pname)
+            if m:
+                return m.group(1).strip()
+    except Exception:
+        pass
+
+    # 2. Check siblings in the same container
+    try:
+        parent = getattr(obj, "parent", None)
+        if parent:
+            for sibling in getattr(parent, "children", []) or []:
+                if sibling != obj:
+                    sname = getattr(sibling, "name", "") or ""
+                    m = APPS_FOUND_PATTERN.search(sname)
+                    if m:
+                        return m.group(1).strip()
+
+            # 3. Check previous container (the header row above filter controls)
+            prevParent = getattr(parent, "previous", None)
+            if prevParent:
+                ppname = getattr(prevParent, "name", "") or ""
+                m = APPS_FOUND_PATTERN.search(ppname)
+                if m:
+                    return m.group(1).strip()
+                for child in getattr(prevParent, "children", []) or []:
+                    cname = getattr(child, "name", "") or ""
+                    m = APPS_FOUND_PATTERN.search(cname)
+                    if m:
+                        return m.group(1).strip()
+
+            # 4. Check grandparent level siblings/children
+            grandParent = getattr(parent, "parent", None)
+            if grandParent:
+                for uncle in getattr(grandParent, "children", []) or []:
+                    if uncle != parent:
+                        uname = getattr(uncle, "name", "") or ""
+                        m = APPS_FOUND_PATTERN.search(uname)
+                        if m:
+                            return m.group(1).strip()
+                        for child in getattr(uncle, "children", []) or []:
+                            cname = getattr(child, "name", "") or ""
+                            m = APPS_FOUND_PATTERN.search(cname)
+                            if m:
+                                return m.group(1).strip()
+    except Exception:
+        pass
+
+    return None
+
+
+def extractAppSize(obj):
+    """
+    Extracts the application size (e.g. "350 MB", "1.25 GB") from an installed app list item.
+    Inspects descendants via breadth-first search as well as firstChild/next navigation.
+    """
+    if not obj:
+        return None
+
+    # Strategy 1: Breadth-first search of children and grandchildren up to depth 3
+    queue = [(obj, 0)]
+    visited = set()
+    while queue:
+        curr, depth = queue.pop(0)
+        currId = id(curr)
+        if currId in visited:
+            continue
+        visited.add(currId)
+
+        if depth > 0:
+            for attr in ("name", "value", "description", "displayText"):
+                try:
+                    val = getattr(curr, attr, "") or ""
+                    if isinstance(val, str) and val.strip():
+                        valClean = val.strip()
+                        m = SIZE_REGEX.match(valClean)
+                        if m:
+                            return m.group(1).strip()
+                        m = EMBEDDED_SIZE_REGEX.search(valClean)
+                        if m:
+                            return m.group(1).strip()
+                except Exception:
+                    pass
+
+        if depth < 3:
+            try:
+                for child in getattr(curr, "children", []) or []:
+                    queue.append((child, depth + 1))
+            except Exception:
+                pass
+
+    # Strategy 2: Walk firstChild and next siblings
+    try:
+        curr = getattr(obj, "firstChild", None)
+        count = 0
+        while curr and count < 25:
+            for attr in ("name", "value", "description", "displayText"):
+                try:
+                    val = getattr(curr, attr, "") or ""
+                    if isinstance(val, str) and val.strip():
+                        valClean = val.strip()
+                        m = SIZE_REGEX.match(valClean) or EMBEDDED_SIZE_REGEX.search(valClean)
+                        if m:
+                            return m.group(1).strip()
+                except Exception:
+                    pass
+
+            # Also check child of this column/cell
+            try:
+                cellChild = getattr(curr, "firstChild", None)
+                if cellChild:
+                    for attr in ("name", "value", "description", "displayText"):
+                        val = getattr(cellChild, attr, "") or ""
+                        if isinstance(val, str) and val.strip():
+                            valClean = val.strip()
+                            m = SIZE_REGEX.match(valClean) or EMBEDDED_SIZE_REGEX.search(valClean)
+                            if m:
+                                return m.group(1).strip()
+            except Exception:
+                pass
+
+            curr = getattr(curr, "next", None)
+            count += 1
+    except Exception:
+        pass
+
+    return None
+
+
+class InstalledAppItemOverlay(NVDAObjects.UIA.UIA):
+    """
+    Overlay class for installed app items in Windows 11 Settings.
+    Appends the application size to the object's name so NVDA speaks and brailles
+    it automatically while navigating the list.
+    """
+
+    _appSize = None
+
+    def _get_name(self):
+        try:
+            baseName = super()._get_name() or ""
+        except Exception:
+            baseName = getattr(self, "_name", "") or ""
+
+        try:
+            if self._appSize is None:
+                self._appSize = extractAppSize(self) or ""
+            if self._appSize and self._appSize not in baseName:
+                return f"{baseName}, {self._appSize}"
+        except Exception:
+            pass
+
+        return baseName
+
+    def _get_description(self):
+        try:
+            baseDesc = super()._get_description() or ""
+        except Exception:
+            baseDesc = getattr(self, "_description", "") or ""
+
+        try:
+            if self._appSize is None:
+                self._appSize = extractAppSize(self) or ""
+            baseName = getattr(self, "name", "") or ""
+            if self._appSize and self._appSize not in baseDesc and self._appSize not in baseName:
+                if baseDesc:
+                    return f"{baseDesc}, {self._appSize}"
+                return self._appSize
+        except Exception:
+            pass
+
+        return baseDesc
+
+
+def isInstalledAppListItem(obj):
+    """
+    Checks whether the object represents an item in the Windows 11 installed apps list.
+    Safely uses valid NVDA controlTypes.Role enum values.
+    """
+    try:
+        if not isSettingsApp(obj):
+            return False
+
+        role = getattr(obj, "role", None)
+        validRoles = (
+            controlTypes.Role.LISTITEM,
+            controlTypes.Role.DATAITEM,
+            getattr(controlTypes.Role, "TABLEROW", None),
+        )
+        if role not in validRoles:
+            return False
+
+        # Check parent/ancestor
+        parent = getattr(obj, "parent", None)
+        if parent:
+            parentRole = getattr(parent, "role", None)
+            parentAutoId = ""
+            if isinstance(parent, getattr(NVDAObjects.UIA, "UIA", tuple())):
+                try:
+                    parentAutoId = (getattr(parent, "UIAAutomationId", "") or "").lower()
+                except Exception:
+                    parentAutoId = ""
+
+            validParentRoles = (
+                controlTypes.Role.LIST,
+                controlTypes.Role.TABLE,
+                controlTypes.Role.DATAGRID,
+                getattr(controlTypes.Role, "TABLEBODY", None),
+            )
+            if parentRole in validParentRoles:
+                if not parentAutoId or any(k in parentAutoId for k in ("app", "install", "features", "list")):
+                    return True
+
+        # If size can be extracted, it is definitely an installed app item
+        if extractAppSize(obj):
+            return True
+
+    except Exception:
+        pass
+
+    return False
+
+
+def handleGainFocus(obj, nextHandler):
+    """
+    Called from GlobalPlugin.event_gainFocus.
+    - If focused control is drive filter combo box, announces 'X apps found'.
+    - If focused control is an installed app item, ensures app size is announced.
+    """
+    global _lastAnnouncedAppsFound, _lastAnnouncedTime
+
+    # Always let NVDA's normal focus reporting proceed
+    nextHandler()
+
+    try:
+        if isDriveFilterComboBox(obj):
+            appsCountText = findAppsFoundText(obj)
+            now = time.time()
+            if appsCountText:
+                if appsCountText != _lastAnnouncedAppsFound or (now - _lastAnnouncedTime) > 1.0:
+                    _lastAnnouncedAppsFound = appsCountText
+                    _lastAnnouncedTime = now
+                    ui.message(appsCountText)
+        elif isInstalledAppListItem(obj):
+            # Fallback announcement: If overlay wasn't applied or name doesn't contain size yet, speak it
+            size = extractAppSize(obj)
+            if size:
+                baseName = getattr(obj, "name", "") or ""
+                if size not in baseName:
+                    ui.message(size)
+    except Exception as e:
+        log.error(f"win11_access: Error in handleGainFocus for installed apps: {e}")
+
+
+def chooseNVDAObjectOverlayClasses(obj, clsList):
+    """Applies InstalledAppItemOverlay to installed app items."""
+    try:
+        if not isinstance(obj, getattr(NVDAObjects.UIA, "UIA", tuple())):
+            return
+        if isInstalledAppListItem(obj):
+            clsList.insert(0, InstalledAppItemOverlay)
+    except Exception as e:
+        log.error(f"win11_access: Error in chooseNVDAObjectOverlayClasses for installed apps: {e}")
