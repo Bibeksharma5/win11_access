@@ -2,63 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Accessibility enhancement for Windows 11</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accessibility enhancement for Windows 11 (win11_access)</title>
 <style>
-body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-h1, h2, h3 { color: #005a9e; }
-code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: #222222;
+    background-color: #ffffff;
+    max-width: 780px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+  }
+  h1 {
+    color: #005a9e;
+    border-bottom: 2px solid #005a9e;
+    padding-bottom: 0.3rem;
+  }
+  h2 {
+    color: #005a9e;
+    margin-top: 1.6rem;
+    border-bottom: 1px solid #e1e4e8;
+    padding-bottom: 0.2rem;
+  }
+  ul, ol {
+    padding-left: 1.6rem;
+  }
+  li {
+    margin-bottom: 0.35rem;
+  }
+  code {
+    background: #f4f6f8;
+    color: #bf1818;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    font-family: Consolas, "Courier New", monospace;
+  }
+  a {
+    color: #0066cc;
+    text-decoration: none;
+  }
+  a:hover, a:focus {
+    text-decoration: underline;
+  }
+  .info-box {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.8rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .info-box ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+  }
 </style>
 </head>
 <body>
-<h1>Accessibility enhancement for Windows 11 (win11_access)</h1>
-<ul>
-<li><strong>Author:</strong> Bibek</li>
-<li><strong>Version:</strong> 1.0</li>
-<li><strong>Minimum NVDA Version:</strong> 2026.1</li>
-<li><strong>Last Tested NVDA Version:</strong> 2026.3</li>
-</ul>
-<p>This NVDA add-on provides targeted accessibility enhancements for Windows 11, improving the screen reading experience across core Windows experiences.</p>
+<header>
+  <h1>Accessibility Enhancement for Windows 11 (win11_access)</h1>
+  <div class="info-box">
+    <ul>
+      <li><strong>Author:</strong> Bibek Sharma Dhakal</li>
+      <li><strong>Version:</strong> 1.0</li>
+      <li><strong>NVDA Compatibility:</strong> 2026.1 to 2026.3</li>
+      <li><strong>Target OS:</strong> Windows 11</li>
+      <li><strong>Homepage:</strong> <a href="https://github.com/Bibeksharma5/win11_access" target="_blank" rel="noopener noreferrer">https://github.com/Bibeksharma5/win11_access</a></li>
+    </ul>
+  </div>
+  <p>This add-on provides lightweight but important accessibility enhancements for Windows 11, inspired by <a href="https://github.com/josephsl/wintenApps" target="_blank" rel="noopener noreferrer">Windows App Essentials</a>.</p>
+</header>
 
-<h2>Features</h2>
+<main>
+  <h2>Features</h2>
+  <ul>
+    <li><strong>Windows Search (Start Menu):</strong> Suppresses repetitive <em>"context menu list"</em> announcements when navigating search result context menu items with Up/Down arrow keys.</li>
+    <li><strong>Windows Settings (Installed Apps):</strong>
+      <ul>
+        <li>Announces the total number of applications found when focusing the "Filter by drive" combo box.</li>
+        <li>Automatically announces each application's storage size while navigating through the installed applications list.</li>
+      </ul>
+    </li>
+    <li><strong>Windows Calculator:</strong> Automatically announces the active calculation mode (e.g. Standard, Scientific, Programmer) upon opening Calculator.</li>
+  </ul>
 
-<h3>1. Windows Search (Start Menu) Context Menu Navigation</h3>
-<ul>
-<li><strong>Issue Addressed:</strong> When searching in the Windows 11 Start Menu and opening the context menu on a search result (e.g. via Application key or Shift+F10), navigating through items with the Up or Down arrow key caused NVDA to repeatedly announce "context menu list" before every item (e.g. <em>"context menu list, open 1 of 5"</em>, <em>"context menu list, open file location 2 of 5"</em>).</li>
-<li><strong>Enhancement:</strong> The repetitive announcement of "context menu list" is suppressed while navigating menu items with Up or Down arrow keys. NVDA speaks only the relevant menu item and position (e.g. <em>"open 1 of 5"</em>, <em>"open file location 2 of 5"</em>), making browsing options faster and much easier to listen to. Context menus in other applications remain unaffected.</li>
-</ul>
+  <h2>Installation</h2>
+  <ol>
+    <li>Download or locate <code>win11_access.nvda-addon</code>.</li>
+    <li>Press <code>Enter</code> on the file or install it through NVDA Menu &gt; <strong>Tools</strong> &gt; <strong>Add-on Store</strong>.</li>
+    <li>Confirm the installation prompt and restart NVDA.</li>
+  </ol>
 
-<h3>2. Windows Settings — Installed Apps Enhancements</h3>
-<ul>
-<li><strong>Number of Apps Found Announcement:</strong>
-<ul>
-<li>In Windows Settings under <strong>Apps &gt; Installed apps</strong>, a text label displays the total count of applications (e.g. <em>"137 apps found"</em>).</li>
-<li>When you navigate focus to the <strong>Filter by drive</strong> combo box, NVDA automatically announces the number of apps found.</li>
-</ul>
-</li>
-<li><strong>Application Size in the App List:</strong>
-<ul>
-<li>While navigating through the list of installed applications in Installed Apps, NVDA automatically announces each application's storage size (e.g. <em>"Google Chrome, 350 MB, list item, 1 of 137"</em>).</li>
-<li>You no longer need to switch to NVDA object navigation to read the app size from the table column.</li>
-</ul>
-</li>
-</ul>
-
-<h3>3. Windows Calculator Mode Announcement</h3>
-<ul>
-<li><strong>Enhancement:</strong> Upon opening the Windows 11 Calculator application, NVDA automatically announces the currently active calculation mode (e.g. <em>"Standard mode"</em>, <em>"Scientific mode"</em>, <em>"Programmer mode"</em>).</li>
-</ul>
-
-<h2>Installation</h2>
-<ol>
-<li>Download or locate <code>win11_access.nvda-addon</code>.</li>
-<li>Press <code>Enter</code> on the file or open it through the NVDA Add-ons Manager (<code>NVDA menu &gt; Tools &gt; Add-ons store / Add-ons Manager</code>).</li>
-<li>Follow the prompts to install and restart NVDA.</li>
-</ol>
-
-<h2>Requirements</h2>
-<ul>
-<li>Windows 11 (latest releases)</li>
-<li>NVDA 2026.1 to 2026.3</li>
-</ul>
+  <h2>Notes</h2>
+  <ul>
+    <li>This add-on was developed independently from scratch without utilizing or borrowing any external source code.</li>
+    <li>This add-on has been tested with the latest Windows 11 builds.</li>
+    <li>If you would like to see any new feature or enhancement integrated, you are welcome to submit an issue or suggestion on the <a href="https://github.com/Bibeksharma5/win11_access/issues" target="_blank" rel="noopener noreferrer">GitHub Issue Tracker</a>.</li>
+  </ul>
+</main>
 </body>
 </html>
