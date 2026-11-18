@@ -1,7 +1,7 @@
 # Accessibility Enhancement for Windows 11 (win11_access)
 
 * **Author:** Bibek Sharma Dhakal
-* **Version:** 1.0
+* **Version:** 1.1
 * **NVDA Compatibility:** 2026.1 to 2026.3
 * **Target OS:** Windows 11
 * **Homepage:** [https://github.com/Bibeksharma5/win11_access](https://github.com/Bibeksharma5/win11_access)

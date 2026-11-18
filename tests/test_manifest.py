@@ -27,7 +27,7 @@ class TestManifest(unittest.TestCase):
 
         self.assertEqual(get_val("name"), "win11_access")
         self.assertEqual(get_val("summary"), "Accessibility enhancement for windows 11")
-        self.assertEqual(get_val("version"), "1.0")
+        self.assertEqual(get_val("version"), "1.1")
         self.assertEqual(get_val("author"), "Bibek Sharma Dhakal")
         self.assertEqual(get_val("minimumNVDAVersion"), "2026.1")
         self.assertEqual(get_val("lastTestedNVDAVersion"), "2026.3")

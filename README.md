@@ -6,7 +6,7 @@ An NVDA add-on providing lightweight but important accessibility enhancements fo
 
 ## Add-on Information
 
-* **Version:** 1.0
+* **Version:** 1.1
 * **Author:** Bibek Sharma Dhakal
 * **Homepage:** [https://github.com/Bibeksharma5/win11_access](https://github.com/Bibeksharma5/win11_access)
 * **NVDA Compatibility:** 2026.1 to 2026.3

@@ -46,7 +46,7 @@ def validate_manifest():
     print(f"  Last Tested NVDA Version: {last_version}")
 
     assert name == "win11_access", f"Expected name 'win11_access', got '{name}'"
-    assert version == "1.0", f"Expected version '1.0', got '{version}'"
+    assert version == "1.1", f"Expected version '1.1', got '{version}'"
     assert min_version == "2026.1", f"Expected minimumNVDAVersion '2026.1', got '{min_version}'"
     assert last_version == "2026.3", f"Expected lastTestedNVDAVersion '2026.3', got '{last_version}'"
     print("  [OK] Manifest validated successfully.")
