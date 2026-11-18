@@ -192,6 +192,36 @@ class TestCalculator(unittest.TestCase):
         self.assertEqual(len(called), 1)
         self.assertIn("Scientific mode", nvda_mocks.ui.messages)
 
+    def test_extractModeFromText(self):
+        self.assertEqual(calculator._extractModeFromText("Standard - Calculator"), "Standard")
+        self.assertEqual(calculator._extractModeFromText("Calculator - Standard"), "Standard")
+        self.assertEqual(calculator._extractModeFromText("Scientific Calculator"), "Scientific")
+        self.assertEqual(calculator._extractModeFromText("Programmer mode"), "Programmer")
+        self.assertEqual(calculator._extractModeFromText("Standard"), "Standard")
+        self.assertEqual(calculator._extractModeFromText("Date Calculation"), "Date Calculation")
+        self.assertIsNone(calculator._extractModeFromText("Calculator"))
+        self.assertIsNone(calculator._extractModeFromText(""))
+        self.assertIsNone(calculator._extractModeFromText(None))
+
+    def test_AppModule_immediate_announcement_without_delay(self):
+        appMod = calculator.AppModule(100, "calculatorapp")
+        calc_win = SimpleNamespace(
+            name="Standard - Calculator",
+            appModule=appMod,
+            windowHandle=7001,
+            children=[]
+        )
+        called = []
+        def nextHandler():
+            called.append(True)
+
+        nvda_mocks.ui.messages.clear()
+        appMod.event_foreground(calc_win, nextHandler)
+        # Should announce immediately at 0ms (from window title)
+        self.assertIn("Standard mode", nvda_mocks.ui.messages)
+        self.assertIn(7001, appMod._announcedHwnds)
+        self.assertNotIn(7001, appMod._pendingHwnds)
+
     def test_calculatorapp_module_aliases_calculator(self):
         self.assertIs(calculatorapp.AppModule, calculator.AppModule)
 

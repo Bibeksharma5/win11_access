@@ -6,7 +6,8 @@
 #
 # Enhancements for Windows Calculator:
 # Announces the currently active calculation mode (e.g. Standard mode, Scientific mode,
-# Programmer mode) upon opening or switching to the Calculator application.
+# Programmer mode) immediately upon opening or switching to the Calculator application,
+# without sluggishness or delay.
 
 import api
 import core
@@ -52,6 +53,56 @@ CALCULATOR_APP_NAMES = {
     "calc",
     "windowscalculator",
 }
+
+HEADER_AUTOMATION_IDS = {
+    "header",
+    "headertitletext",
+    "normalheader",
+    "staticheader",
+    "titlecontentcontrol",
+    "navviewheader",
+}
+
+
+def _extractModeFromText(text):
+    """
+    Extracts a known calculation mode from a string if present.
+    Handles 'Standard - Calculator', 'Standard Calculator', 'Standard mode', etc.
+    Returns the mode string or None.
+    """
+    if not text or not isinstance(text, str):
+        return None
+    textClean = text.strip()
+    if not textClean:
+        return None
+    textLower = textClean.lower()
+
+    # Check "Mode - Calculator" or "Calculator - Mode"
+    if " - " in textClean:
+        for part in textClean.split(" - "):
+            partClean = part.strip()
+            partLower = partClean.lower()
+            for mode in KNOWN_CALCULATOR_MODES:
+                if partLower == mode.lower() or partLower == f"{mode.lower()} calculator" or partLower == f"{mode.lower()} mode":
+                    return mode
+
+    # Check exact match or "Standard Calculator" / "Standard mode"
+    for mode in KNOWN_CALCULATOR_MODES:
+        modeLower = mode.lower()
+        if textLower == modeLower:
+            return mode
+        if textLower == f"{modeLower} calculator" or textLower == f"calculator {modeLower}":
+            return mode
+        if textLower == f"{modeLower} mode":
+            return mode
+
+    # Check if string starts with "<Mode> "
+    for mode in KNOWN_CALCULATOR_MODES:
+        modeLower = mode.lower()
+        if textLower.startswith(f"{modeLower} "):
+            return mode
+
+    return None
 
 
 def isCalculatorApp(obj):
@@ -124,16 +175,10 @@ def _findElementByAutoId(root, targetAutoId, maxDepth=8):
         visited.add(currId)
 
         currAutoId = ""
-        if isinstance(curr, getattr(NVDAObjects.UIA, "UIA", tuple())):
-            try:
-                currAutoId = (getattr(curr, "UIAAutomationId", "") or "").lower()
-            except Exception:
-                currAutoId = ""
-        else:
-            try:
-                currAutoId = (getattr(curr, "UIAAutomationId", "") or "").lower()
-            except Exception:
-                currAutoId = ""
+        try:
+            currAutoId = (getattr(curr, "UIAAutomationId", "") or "").lower()
+        except Exception:
+            currAutoId = ""
 
         if currAutoId == targetLower:
             return curr
@@ -166,11 +211,9 @@ def _findKnownModeInDescendants(root, maxDepth=8):
                 currName = (getattr(curr, attr, "") or "").strip()
                 if not currName:
                     continue
-                currNameLower = currName.lower()
-                for mode in KNOWN_CALCULATOR_MODES:
-                    modeLower = mode.lower()
-                    if currNameLower == modeLower or currNameLower == f"{modeLower} calculator":
-                        return mode
+                mode = _extractModeFromText(currName)
+                if mode:
+                    return mode
             except Exception:
                 pass
 
@@ -183,17 +226,79 @@ def _findKnownModeInDescendants(root, maxDepth=8):
     return None
 
 
-def getCalculatorMode():
+def _findModeInTree(root, maxDepth=4):
+    """
+    Fast, single-pass breadth-first search for Calculator mode.
+    Inspects element names, values, and AutomationIds in one shallow traversal.
+    """
+    if not root:
+        return None
+
+    queue = [(root, 0)]
+    visited = set()
+
+    while queue:
+        curr, depth = queue.pop(0)
+        currId = id(curr)
+        if currId in visited:
+            continue
+        visited.add(currId)
+
+        # Check AutomationId
+        currAutoId = ""
+        try:
+            currAutoId = (getattr(curr, "UIAAutomationId", "") or "").lower()
+        except Exception:
+            currAutoId = ""
+
+        # If element is a known header container, check its name or value
+        if currAutoId in HEADER_AUTOMATION_IDS:
+            for attr in ("name", "displayText", "value"):
+                try:
+                    val = (getattr(curr, attr, "") or "").strip()
+                    mode = _extractModeFromText(val)
+                    if mode:
+                        return mode
+                    if val and val in KNOWN_CALCULATOR_MODES:
+                        return val
+                except Exception:
+                    pass
+
+        # Check if element's name/text matches a known mode
+        for attr in ("name", "displayText", "value"):
+            try:
+                val = (getattr(curr, attr, "") or "").strip()
+                if val:
+                    mode = _extractModeFromText(val)
+                    if mode:
+                        return mode
+            except Exception:
+                pass
+
+        if depth < maxDepth:
+            try:
+                for child in getattr(curr, "children", []) or []:
+                    queue.append((child, depth + 1))
+            except Exception:
+                pass
+
+    return None
+
+
+def getCalculatorMode(obj=None):
     """
     Attempts to identify the currently active calculation mode in Calculator.
-    Checks candidate objects (focusObject, foregroundObject), window titles,
-    and descendant elements.
+    Checks candidate objects (passed obj, focusObject, foregroundObject),
+    window titles, and fast shallow descendant searches.
     Returns mode name string if found, otherwise None.
     """
     candidates = []
 
+    if obj and isCalculatorApp(obj):
+        candidates.append(obj)
+
     focusObj = api.getFocusObject()
-    if focusObj and isCalculatorApp(focusObj):
+    if focusObj and isCalculatorApp(focusObj) and focusObj not in candidates:
         candidates.append(focusObj)
 
     fg = api.getForegroundObject()
@@ -214,53 +319,90 @@ def getCalculatorMode():
     if not candidates:
         return None
 
-    # Step 1: Check window title for formatted mode (e.g. "Standard - Calculator")
+    # Step 1: Immediate check on candidate names and window titles (0 ms)
     for root in candidates:
+        for attr in ("name", "displayText", "value"):
+            try:
+                val = getattr(root, attr, "") or ""
+                mode = _extractModeFromText(val)
+                if mode:
+                    return mode
+            except Exception:
+                pass
+
         hwnd = getattr(root, "windowHandle", None)
         if hwnd:
             try:
                 title = winUser.getWindowText(hwnd) or ""
-                if " - calculator" in title.lower():
-                    modePart = title.split(" - ")[0].strip()
-                    for mode in KNOWN_CALCULATOR_MODES:
-                        if mode.lower() == modePart.lower():
-                            return mode
+                mode = _extractModeFromText(title)
+                if mode:
+                    return mode
             except Exception:
                 pass
 
-    # Step 2: Search for Header element or known modes from each candidate and its root
+    # Step 2: Immediate check on parents/ancestors up to 4 levels
     for root in candidates:
-        # Walk up to find the top container
+        curr = root
+        for _ in range(4):
+            p = getattr(curr, "parent", None)
+            if not p:
+                break
+            for attr in ("name", "displayText", "value"):
+                try:
+                    val = getattr(p, attr, "") or ""
+                    mode = _extractModeFromText(val)
+                    if mode:
+                        return mode
+                except Exception:
+                    pass
+            hwnd = getattr(p, "windowHandle", None)
+            if hwnd:
+                try:
+                    title = winUser.getWindowText(hwnd) or ""
+                    mode = _extractModeFromText(title)
+                    if mode:
+                        return mode
+                except Exception:
+                    pass
+            curr = p
+
+    # Step 3: Fast single-pass shallow search (depth <= 4) from top containers
+    visitedContainers = set()
+    for root in candidates:
         top = root
         curr = root
-        for _ in range(6):
+        for _ in range(5):
             p = getattr(curr, "parent", None)
             if not p:
                 break
             top = p
             curr = p
 
-        # Check AutomationId "Header" or "HeaderTitleText"
         for searchRoot in (top, root):
-            for headerId in ("Header", "HeaderTitleText", "NormalHeader"):
-                header = _findElementByAutoId(searchRoot, headerId, maxDepth=8)
-                if header:
-                    name = getattr(header, "name", "") or ""
-                    if name and name.strip():
-                        return name.strip()
+            rootId = id(searchRoot)
+            if rootId in visitedContainers:
+                continue
+            visitedContainers.add(rootId)
 
-        # Check known mode names in descendants
-        for searchRoot in (top, root):
-            mode = _findKnownModeInDescendants(searchRoot, maxDepth=8)
+            mode = _findModeInTree(searchRoot, maxDepth=4)
             if mode:
                 return mode
+
+    # Step 4: Fallback search for AutomationId "Header" / "HeaderTitleText" if deep
+    for root in candidates:
+        for headerId in ("Header", "HeaderTitleText", "NormalHeader"):
+            header = _findElementByAutoId(root, headerId, maxDepth=8)
+            if header:
+                name = getattr(header, "name", "") or ""
+                if name and name.strip():
+                    return name.strip()
 
     return None
 
 
-def _announceModeCallback(rootHwnd, retryCount=0):
-    """Callback function scheduled to run after Calculator opens to announce the mode."""
-    mode = getCalculatorMode()
+def _announceModeCallback(rootHwnd, retryCount=0, obj=None):
+    """Callback function to announce Calculator mode, with fast short retries if needed."""
+    mode = getCalculatorMode(obj)
     if mode:
         if "mode" in mode.lower() or "calculator" in mode.lower():
             message = mode
@@ -269,14 +411,14 @@ def _announceModeCallback(rootHwnd, retryCount=0):
         ui.message(message)
         log.info(f"win11_access: Announced Calculator mode: {message}")
     elif retryCount < 4:
-        # If UI elements haven't fully rendered in the WinUI 3 XAML island, retry after 150ms
-        core.callLater(150, lambda: _announceModeCallback(rootHwnd, retryCount + 1))
+        # Fast retry with minimal 50ms interval if WinUI 3 XAML island is still rendering
+        core.callLater(50, lambda: _announceModeCallback(rootHwnd, retryCount + 1, obj))
 
 
 def handleCalculatorFocus(obj):
     """
     Called on focus or foreground events.
-    Detects if this is a newly opened Calculator window and schedules mode announcement.
+    Detects if this is a newly opened Calculator window and announces active mode immediately.
     """
     global _announcedCalculatorHwnds
     if not isCalculatorApp(obj):
@@ -293,27 +435,39 @@ def handleCalculatorFocus(obj):
         return
 
     if rootHwnd not in _announcedCalculatorHwnds:
+        # Check immediately without artificial delay
+        mode = getCalculatorMode(obj)
+        if mode:
+            _announcedCalculatorHwnds.add(rootHwnd)
+            if "mode" in mode.lower() or "calculator" in mode.lower():
+                message = mode
+            else:
+                message = f"{mode} mode"
+            ui.message(message)
+            log.info(f"win11_access: Announced Calculator mode: {message}")
+            return
+
         _announcedCalculatorHwnds.add(rootHwnd)
-        # Clean up stale window handles
         try:
             _announcedCalculatorHwnds = {h for h in _announcedCalculatorHwnds if winUser.isWindow(h)}
         except Exception:
             pass
 
-        # Schedule mode announcement after 200ms to allow UI elements to render
-        core.callLater(200, lambda: _announceModeCallback(rootHwnd, 0))
+        # Schedule quick retry (50ms) only if not ready yet
+        core.callLater(50, lambda: _announceModeCallback(rootHwnd, 0, obj))
 
 
 class AppModule(BuiltInAppModule):
     """
     App module for Windows Calculator.
     Announces the active calculation mode (Standard, Scientific, Programmer, etc.)
-    upon opening the application.
+    immediately upon opening or switching to the application.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._announcedHwnds = set()
+        self._pendingHwnds = set()
 
     def event_foreground(self, obj, nextHandler):
         """Called when Calculator window comes to foreground."""
@@ -337,6 +491,15 @@ class AppModule(BuiltInAppModule):
         except Exception as e:
             log.error(f"win11_access: Error in calculator event_gainFocus: {e}")
 
+    def _speakMode(self, mode):
+        """Speaks the active mode message."""
+        if "mode" in mode.lower() or "calculator" in mode.lower():
+            message = mode
+        else:
+            message = f"{mode} mode"
+        ui.message(message)
+        log.info(f"win11_access: Announced Calculator mode: {message}")
+
     def _handleAppFocus(self, obj):
         rootHwnd = getRootCalculatorHwnd(obj) or getattr(obj, "windowHandle", None)
         if not rootHwnd:
@@ -346,26 +509,42 @@ class AppModule(BuiltInAppModule):
         if not rootHwnd:
             return
 
-        if rootHwnd not in self._announcedHwnds:
-            self._announcedHwnds.add(rootHwnd)
-            try:
-                self._announcedHwnds = {h for h in self._announcedHwnds if winUser.isWindow(h)}
-            except Exception:
-                pass
+        if rootHwnd in self._announcedHwnds:
+            return
 
-            core.callLater(200, lambda: self._announceMode(rootHwnd, 0))
+        # Clean up stale window handles
+        try:
+            self._announcedHwnds = {h for h in self._announcedHwnds if winUser.isWindow(h)}
+        except Exception:
+            pass
 
-    def _announceMode(self, rootHwnd, retryCount=0):
-        mode = getCalculatorMode()
+        # Fast path: Attempt immediate detection without delay (0 ms)
+        mode = getCalculatorMode(obj)
         if mode:
-            if "mode" in mode.lower() or "calculator" in mode.lower():
-                message = mode
-            else:
-                message = f"{mode} mode"
-            ui.message(message)
-            log.info(f"win11_access: Announced Calculator mode: {message}")
+            self._pendingHwnds.discard(rootHwnd)
+            self._announcedHwnds.add(rootHwnd)
+            self._speakMode(mode)
+            return
+
+        # Slow path: Schedule quick 50ms retry only if UI elements are still rendering
+        if rootHwnd not in self._pendingHwnds:
+            self._pendingHwnds.add(rootHwnd)
+            core.callLater(50, lambda: self._announceMode(rootHwnd, 1, obj))
+
+    def _announceMode(self, rootHwnd, retryCount=0, obj=None):
+        if rootHwnd in self._announcedHwnds:
+            self._pendingHwnds.discard(rootHwnd)
+            return
+
+        mode = getCalculatorMode(obj)
+        if mode:
+            self._pendingHwnds.discard(rootHwnd)
+            self._announcedHwnds.add(rootHwnd)
+            self._speakMode(mode)
         elif retryCount < 4:
-            core.callLater(150, lambda: self._announceMode(rootHwnd, retryCount + 1))
+            core.callLater(50, lambda: self._announceMode(rootHwnd, retryCount + 1, obj))
+        else:
+            self._pendingHwnds.discard(rootHwnd)
 
 
 def handleForeground(obj, nextHandler):
