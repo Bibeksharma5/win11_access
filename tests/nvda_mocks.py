@@ -153,6 +153,29 @@ class GlobalPlugin:
     def terminate(self): pass
 globalPluginHandler.GlobalPlugin = GlobalPlugin
 
+# Setup appModuleHandler mock
+appModuleHandler = ModuleType("appModuleHandler")
+class AppModule:
+    def __init__(self, processID=0, appName=""):
+        self.processID = processID
+        self.appName = appName
+    def chooseNVDAObjectOverlayClasses(self, obj, clsList): pass
+    def event_gainFocus(self, obj, nextHandler): nextHandler()
+    def event_foreground(self, obj, nextHandler): nextHandler()
+appModuleHandler.AppModule = AppModule
+appModuleHandler._registeredExecutables = {}
+def registerExecutableWithAppModule(executableName, appModName):
+    appModuleHandler._registeredExecutables[executableName] = appModName
+def unregisterExecutable(executableName):
+    appModuleHandler._registeredExecutables.pop(executableName, None)
+appModuleHandler.registerExecutableWithAppModule = registerExecutableWithAppModule
+appModuleHandler.unregisterExecutable = unregisterExecutable
+
+# Setup nvdaBuiltin mock
+nvdaBuiltin = ModuleType("nvdaBuiltin")
+nvdaBuiltinAppModules = ModuleType("nvdaBuiltin.appModules")
+nvdaBuiltin.appModules = nvdaBuiltinAppModules
+
 def install_mocks():
     sys.modules["controlTypes"] = controlTypes
     sys.modules["winUser"] = winUser
@@ -165,3 +188,6 @@ def install_mocks():
     sys.modules["core"] = core
     sys.modules["ui"] = ui
     sys.modules["globalPluginHandler"] = globalPluginHandler
+    sys.modules["appModuleHandler"] = appModuleHandler
+    sys.modules["nvdaBuiltin"] = nvdaBuiltin
+    sys.modules["nvdaBuiltin.appModules"] = nvdaBuiltinAppModules

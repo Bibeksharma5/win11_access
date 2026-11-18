@@ -1,8 +1,12 @@
 # -*- coding: UTF-8 -*-
 # calculator.py
-# Enhancement for Windows 11 Calculator:
+# NVDA App Module for Windows Calculator (CalculatorApp.exe, Calculator.exe, calc.exe)
+# Part of win11_access add-on.
+# Author: Bibek Sharma Dhakal
+#
+# Enhancements for Windows Calculator:
 # Announces the currently active calculation mode (e.g. Standard mode, Scientific mode,
-# Programmer mode) upon opening the Calculator application.
+# Programmer mode) upon opening or switching to the Calculator application.
 
 import api
 import core
@@ -10,8 +14,14 @@ import ui
 import winUser
 from logHandler import log
 import NVDAObjects.UIA
+import appModuleHandler
 
-# Set of calculator window handles (HWNDs) that have already had their mode announced
+try:
+    from nvdaBuiltin.appModules.calculator import AppModule as BuiltInAppModule
+except ImportError:
+    BuiltInAppModule = appModuleHandler.AppModule
+
+# Global fallback set of calculator window handles (HWNDs) that have already had their mode announced
 _announcedCalculatorHwnds = set()
 
 # Known calculation modes in Windows 11 Calculator
@@ -294,8 +304,72 @@ def handleCalculatorFocus(obj):
         core.callLater(200, lambda: _announceModeCallback(rootHwnd, 0))
 
 
+class AppModule(BuiltInAppModule):
+    """
+    App module for Windows Calculator.
+    Announces the active calculation mode (Standard, Scientific, Programmer, etc.)
+    upon opening the application.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._announcedHwnds = set()
+
+    def event_foreground(self, obj, nextHandler):
+        """Called when Calculator window comes to foreground."""
+        if hasattr(super(), "event_foreground"):
+            super().event_foreground(obj, nextHandler)
+        else:
+            nextHandler()
+        try:
+            self._handleAppFocus(obj)
+        except Exception as e:
+            log.error(f"win11_access: Error in calculator event_foreground: {e}")
+
+    def event_gainFocus(self, obj, nextHandler):
+        """Called when an element in Calculator gains focus."""
+        if hasattr(super(), "event_gainFocus"):
+            super().event_gainFocus(obj, nextHandler)
+        else:
+            nextHandler()
+        try:
+            self._handleAppFocus(obj)
+        except Exception as e:
+            log.error(f"win11_access: Error in calculator event_gainFocus: {e}")
+
+    def _handleAppFocus(self, obj):
+        rootHwnd = getRootCalculatorHwnd(obj) or getattr(obj, "windowHandle", None)
+        if not rootHwnd:
+            fg = api.getForegroundObject()
+            rootHwnd = getRootCalculatorHwnd(fg) or getattr(fg, "windowHandle", None)
+
+        if not rootHwnd:
+            return
+
+        if rootHwnd not in self._announcedHwnds:
+            self._announcedHwnds.add(rootHwnd)
+            try:
+                self._announcedHwnds = {h for h in self._announcedHwnds if winUser.isWindow(h)}
+            except Exception:
+                pass
+
+            core.callLater(200, lambda: self._announceMode(rootHwnd, 0))
+
+    def _announceMode(self, rootHwnd, retryCount=0):
+        mode = getCalculatorMode()
+        if mode:
+            if "mode" in mode.lower() or "calculator" in mode.lower():
+                message = mode
+            else:
+                message = f"{mode} mode"
+            ui.message(message)
+            log.info(f"win11_access: Announced Calculator mode: {message}")
+        elif retryCount < 4:
+            core.callLater(150, lambda: self._announceMode(rootHwnd, retryCount + 1))
+
+
 def handleForeground(obj, nextHandler):
-    """Called from GlobalPlugin.event_foreground."""
+    """Backward compatibility helper."""
     nextHandler()
     try:
         handleCalculatorFocus(obj)
@@ -304,7 +378,7 @@ def handleForeground(obj, nextHandler):
 
 
 def handleGainFocus(obj, nextHandler):
-    """Called from GlobalPlugin.event_gainFocus."""
+    """Backward compatibility helper."""
     nextHandler()
     try:
         handleCalculatorFocus(obj)

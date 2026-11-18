@@ -11,7 +11,7 @@ sys.path.insert(0, tests_dir)
 import nvda_mocks
 nvda_mocks.install_mocks()
 
-from globalPlugins.win11_access import installed_apps
+from appModules import systemsettings as installed_apps
 from types import SimpleNamespace
 
 
@@ -28,8 +28,9 @@ class TestInstalledApps(unittest.TestCase):
         obj = SimpleNamespace(appModule=SimpleNamespace(appName="SystemSettings"))
         self.assertTrue(installed_apps.isSettingsApp(obj))
 
-        obj = SimpleNamespace(appModule=SimpleNamespace(appName="explorer"))
-        self.assertFalse(installed_apps.isSettingsApp(obj))
+        # In an app module, any object routed here is treated as belonging to the app
+        obj = SimpleNamespace(appModule=None)
+        self.assertTrue(installed_apps.isSettingsApp(obj))
 
     def test_isDriveFilterComboBox(self):
         role_combo = nvda_mocks.controlTypes.Role.COMBOBOX
@@ -200,6 +201,39 @@ class TestInstalledApps(unittest.TestCase):
         installed_apps.handleGainFocus(obj, nextHandler)
         self.assertEqual(len(called), 1)
         self.assertIn("512 MB", nvda_mocks.ui.messages)
+
+    def test_AppModule_chooseNVDAObjectOverlayClasses(self):
+        appMod = installed_apps.AppModule(101, "systemsettings")
+        parent = SimpleNamespace(role=nvda_mocks.controlTypes.Role.LIST, parent=None)
+        obj = nvda_mocks.BaseUIA(
+            name="Mozilla Firefox",
+            role=nvda_mocks.controlTypes.Role.LISTITEM,
+            parent=parent,
+            children=[SimpleNamespace(name="200 MB", value="", children=[])]
+        )
+
+        clsList = []
+        appMod.chooseNVDAObjectOverlayClasses(obj, clsList)
+        self.assertIn(installed_apps.InstalledAppItemOverlay, clsList)
+
+    def test_AppModule_event_gainFocus(self):
+        appMod = installed_apps.AppModule(101, "systemsettings")
+        called = []
+        def nextHandler():
+            called.append(True)
+
+        prev = SimpleNamespace(name="50 apps found")
+        obj = SimpleNamespace(
+            role=nvda_mocks.controlTypes.Role.COMBOBOX,
+            name="Filter by drive",
+            previous=prev,
+            parent=None
+        )
+
+        nvda_mocks.ui.messages.clear()
+        appMod.event_gainFocus(obj, nextHandler)
+        self.assertEqual(len(called), 1)
+        self.assertIn("50 apps found", nvda_mocks.ui.messages)
 
 
 if __name__ == "__main__":

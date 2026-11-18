@@ -88,6 +88,21 @@
     <li><strong>Windows Calculator:</strong> Automatically announces the active calculation mode (e.g. Standard, Scientific, Programmer) upon opening Calculator.</li>
   </ul>
 
+  <h2>Architecture</h2>
+  <ul>
+    <li><strong>App Modules (<code>addon/appModules/</code>):</strong>
+      <ul>
+        <li><code>systemsettings.py</code>: Dedicated application module for Windows Settings (<code>SystemSettings.exe</code>). Injects custom overlay classes for the Installed apps list to report application storage sizes effortlessly and announces the total application count upon focusing the drive filter combo box.</li>
+        <li><code>calculatorapp.py</code> / <code>calculator.py</code>: Dedicated application module for Windows Calculator (<code>CalculatorApp.exe</code> and <code>calculator.exe</code>). Automatically detects and announces the active calculation mode upon opening or switching to the app.</li>
+      </ul>
+    </li>
+    <li><strong>Global Plugin (<code>addon/globalPlugins/win11_access/</code>):</strong>
+      <ul>
+        <li>Tracks global input gestures and intercepts search menu focus events to suppress repetitive context menu list announcements during arrow navigation in Windows Search.</li>
+      </ul>
+    </li>
+  </ul>
+
   <h2>Installation</h2>
   <ol>
     <li>Download or locate <code>win11_access.nvda-addon</code>.</li>

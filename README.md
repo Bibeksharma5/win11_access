@@ -24,6 +24,16 @@ An NVDA add-on providing lightweight but important accessibility enhancements fo
 
 ---
 
+## Architecture
+
+* **App Modules (`addon/appModules/`):**
+  * **`systemsettings.py`:** Handles Windows Settings (`SystemSettings.exe`). Attaches custom overlay classes for the Installed apps list to report application storage sizes effortlessly and announces the total application count upon focusing the drive filter combo box.
+  * **`calculatorapp.py` / `calculator.py`:** Handles Windows Calculator (`CalculatorApp.exe` and `calculator.exe`). Automatically detects and announces the active calculation mode upon opening or switching to the app.
+* **Global Plugin (`addon/globalPlugins/win11_access/`):**
+  * Tracks global input gestures and intercepts search menu focus events to suppress repetitive context menu list announcements during arrow navigation in Windows Search.
+
+---
+
 ## Installation
 
 1. Download `win11_access.nvda-addon` from the [releases page](https://github.com/Bibeksharma5/win11_access/releases).

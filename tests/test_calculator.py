@@ -11,7 +11,8 @@ sys.path.insert(0, tests_dir)
 import nvda_mocks
 nvda_mocks.install_mocks()
 
-from globalPlugins.win11_access import calculator
+from appModules import calculator
+from appModules import calculatorapp
 from types import SimpleNamespace
 
 
@@ -106,7 +107,6 @@ class TestCalculator(unittest.TestCase):
         self.assertEqual(mode, "Scientific")
 
     def test_getCalculatorMode_from_focusObject(self):
-        # When foreground is ApplicationFrameHost and focus is inside child button
         header = SimpleNamespace(name="Standard", UIAAutomationId="Header", children=[])
         calc_root = SimpleNamespace(name="Calculator", appModule=SimpleNamespace(appName="calculatorapp"), children=[header])
         btn = SimpleNamespace(name="Clear", appModule=SimpleNamespace(appName="calculatorapp"), parent=calc_root, children=[])
@@ -146,6 +146,54 @@ class TestCalculator(unittest.TestCase):
         nvda_mocks.api._foreground = calc_win2
         calculator.handleCalculatorFocus(calc_win2)
         self.assertIn("Standard mode", nvda_mocks.ui.messages)
+
+    def test_AppModule_event_foreground(self):
+        appMod = calculator.AppModule(100, "calculatorapp")
+        header = SimpleNamespace(name="Standard", UIAAutomationId="Header", children=[])
+        calc_win = SimpleNamespace(
+            name="Calculator",
+            appModule=appMod,
+            windowHandle=6001,
+            children=[header]
+        )
+        nvda_mocks.api._foreground = calc_win
+
+        called = []
+        def nextHandler():
+            called.append(True)
+
+        appMod.event_foreground(calc_win, nextHandler)
+        self.assertEqual(len(called), 1)
+        self.assertIn("Standard mode", nvda_mocks.ui.messages)
+
+        # Repeating event_foreground on same window handle does not duplicate announcement
+        nvda_mocks.ui.messages.clear()
+        called.clear()
+        appMod.event_foreground(calc_win, nextHandler)
+        self.assertEqual(len(called), 1)
+        self.assertEqual(len(nvda_mocks.ui.messages), 0)
+
+    def test_AppModule_event_gainFocus(self):
+        appMod = calculator.AppModule(100, "calculatorapp")
+        header = SimpleNamespace(name="Scientific", UIAAutomationId="Header", children=[])
+        calc_win = SimpleNamespace(
+            name="Calculator",
+            appModule=appMod,
+            windowHandle=6002,
+            children=[header]
+        )
+        nvda_mocks.api._foreground = calc_win
+
+        called = []
+        def nextHandler():
+            called.append(True)
+
+        appMod.event_gainFocus(calc_win, nextHandler)
+        self.assertEqual(len(called), 1)
+        self.assertIn("Scientific mode", nvda_mocks.ui.messages)
+
+    def test_calculatorapp_module_aliases_calculator(self):
+        self.assertIs(calculatorapp.AppModule, calculator.AppModule)
 
 
 if __name__ == "__main__":

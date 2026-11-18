@@ -94,8 +94,9 @@ def verify_package():
         assert "manifest.ini" in names, "manifest.ini missing from root of archive!"
         assert "globalPlugins/win11_access/__init__.py" in names, "Main global plugin missing!"
         assert "globalPlugins/win11_access/search_context_menu.py" in names, "Search context menu module missing!"
-        assert "globalPlugins/win11_access/installed_apps.py" in names, "Installed apps module missing!"
-        assert "globalPlugins/win11_access/calculator.py" in names, "Calculator module missing!"
+        assert "appModules/systemsettings.py" in names, "Settings app module missing!"
+        assert "appModules/calculatorapp.py" in names, "Windows 11 Calculator app module missing!"
+        assert "appModules/calculator.py" in names, "Calculator app module missing!"
         assert any(n.startswith("doc/") for n in names), "Documentation missing!"
     print("  [OK] Package verification passed! All required components are present.")
 

@@ -1,5 +1,9 @@
 # -*- coding: UTF-8 -*-
-# installed_apps.py
+# systemsettings.py
+# NVDA App Module for Windows 11 Settings (SystemSettings.exe)
+# Part of win11_access add-on.
+# Author: Bibek Sharma Dhakal
+#
 # Enhancements for Windows 11 Settings -> Apps -> Installed apps:
 # 1. Announces the number of apps found (e.g. "137 apps found") when focusing the drive filter combo box.
 # 2. Announces the application size (e.g. "350 MB") when navigating the installed applications list.
@@ -10,6 +14,12 @@ import controlTypes
 import ui
 from logHandler import log
 import NVDAObjects.UIA
+import appModuleHandler
+
+try:
+    from nvdaBuiltin.appModules.systemsettings import AppModule as BuiltInAppModule
+except ImportError:
+    BuiltInAppModule = appModuleHandler.AppModule
 
 # Regex pattern to match "X apps found" (supporting various localized variants)
 APPS_FOUND_PATTERN = re.compile(
@@ -29,10 +39,6 @@ EMBEDDED_SIZE_REGEX = re.compile(
     re.IGNORECASE,
 )
 
-# Prevent repetitive duplicate announcements if focus rapidly bounces
-_lastAnnouncedAppsFound = None
-_lastAnnouncedTime = 0.0
-
 
 def isSettingsApp(obj):
     """Checks whether the object belongs to Windows Settings (SystemSettings.exe)."""
@@ -41,9 +47,12 @@ def isSettingsApp(obj):
     try:
         appModule = getattr(obj, "appModule", None)
         appName = (getattr(appModule, "appName", None) or "").lower()
-        return appName == "systemsettings"
+        if appName == "systemsettings":
+            return True
+        # If in an app module, the object belongs to this app
+        return True
     except Exception:
-        return False
+        return True
 
 
 def isDriveFilterComboBox(obj):
@@ -53,8 +62,6 @@ def isDriveFilterComboBox(obj):
     containing "drive" or "filter".
     """
     try:
-        if not isSettingsApp(obj):
-            return False
         if getattr(obj, "role", None) != controlTypes.Role.COMBOBOX:
             return False
 
@@ -267,9 +274,6 @@ def isInstalledAppListItem(obj):
     Safely uses valid NVDA controlTypes.Role enum values.
     """
     try:
-        if not isSettingsApp(obj):
-            return False
-
         role = getattr(obj, "role", None)
         validRoles = (
             controlTypes.Role.LISTITEM,
@@ -310,43 +314,72 @@ def isInstalledAppListItem(obj):
     return False
 
 
-def handleGainFocus(obj, nextHandler):
+class AppModule(BuiltInAppModule):
     """
-    Called from GlobalPlugin.event_gainFocus.
-    - If focused control is drive filter combo box, announces 'X apps found'.
-    - If focused control is an installed app item, ensures app size is announced.
+    App module for Windows Settings (SystemSettings.exe).
+    Enhancements for Windows 11 Settings -> Apps -> Installed apps:
+    - Automatically announces 'X apps found' when focusing the drive filter combo box.
+    - Automatically announces application size while navigating the installed apps list.
     """
-    global _lastAnnouncedAppsFound, _lastAnnouncedTime
 
-    # Always let NVDA's normal focus reporting proceed
-    nextHandler()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lastAnnouncedAppsFound = None
+        self._lastAnnouncedTime = 0.0
 
-    try:
-        if isDriveFilterComboBox(obj):
-            appsCountText = findAppsFoundText(obj)
-            now = time.time()
-            if appsCountText:
-                if appsCountText != _lastAnnouncedAppsFound or (now - _lastAnnouncedTime) > 1.0:
-                    _lastAnnouncedAppsFound = appsCountText
-                    _lastAnnouncedTime = now
-                    ui.message(appsCountText)
-        elif isInstalledAppListItem(obj):
-            # Fallback announcement: If overlay wasn't applied or name doesn't contain size yet, speak it
-            size = extractAppSize(obj)
-            if size:
-                baseName = getattr(obj, "name", "") or ""
-                if size not in baseName:
-                    ui.message(size)
-    except Exception as e:
-        log.error(f"win11_access: Error in handleGainFocus for installed apps: {e}")
+    def chooseNVDAObjectOverlayClasses(self, obj, clsList):
+        """Applies InstalledAppItemOverlay to installed app items."""
+        if hasattr(super(), "chooseNVDAObjectOverlayClasses"):
+            super().chooseNVDAObjectOverlayClasses(obj, clsList)
+        try:
+            if isinstance(obj, getattr(NVDAObjects.UIA, "UIA", tuple())):
+                if isInstalledAppListItem(obj):
+                    clsList.insert(0, InstalledAppItemOverlay)
+        except Exception as e:
+            log.error(f"win11_access: Error in systemsettings chooseNVDAObjectOverlayClasses: {e}")
 
+    def event_gainFocus(self, obj, nextHandler):
+        """
+        Handles focus gain in Windows Settings:
+        - If focused control is drive filter combo box, announces 'X apps found'.
+        - If focused control is an installed app item, ensures app size is announced.
+        """
+        if hasattr(super(), "event_gainFocus"):
+            super().event_gainFocus(obj, nextHandler)
+        else:
+            nextHandler()
+
+        try:
+            if isDriveFilterComboBox(obj):
+                appsCountText = findAppsFoundText(obj)
+                now = time.time()
+                if appsCountText:
+                    if appsCountText != self._lastAnnouncedAppsFound or (now - self._lastAnnouncedTime) > 1.0:
+                        self._lastAnnouncedAppsFound = appsCountText
+                        self._lastAnnouncedTime = now
+                        ui.message(appsCountText)
+            elif isInstalledAppListItem(obj):
+                # Fallback announcement: If overlay wasn't applied or name doesn't contain size yet, speak it
+                size = extractAppSize(obj)
+                if size:
+                    baseName = getattr(obj, "name", "") or ""
+                    if size not in baseName:
+                        ui.message(size)
+        except Exception as e:
+            log.error(f"win11_access: Error in systemsettings event_gainFocus: {e}")
+
+
+# Module-level convenience functions for backwards compatibility and direct invocation
+_moduleInstance = None
+
+def _getModuleInstance():
+    global _moduleInstance
+    if _moduleInstance is None:
+        _moduleInstance = AppModule(0, "systemsettings")
+    return _moduleInstance
 
 def chooseNVDAObjectOverlayClasses(obj, clsList):
-    """Applies InstalledAppItemOverlay to installed app items."""
-    try:
-        if not isinstance(obj, getattr(NVDAObjects.UIA, "UIA", tuple())):
-            return
-        if isInstalledAppListItem(obj):
-            clsList.insert(0, InstalledAppItemOverlay)
-    except Exception as e:
-        log.error(f"win11_access: Error in chooseNVDAObjectOverlayClasses for installed apps: {e}")
+    _getModuleInstance().chooseNVDAObjectOverlayClasses(obj, clsList)
+
+def handleGainFocus(obj, nextHandler):
+    _getModuleInstance().event_gainFocus(obj, nextHandler)

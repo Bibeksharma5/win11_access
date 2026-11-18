@@ -1,1 +1,4 @@
 win11_access.nvda-addon
+__pycache__/
+*.pyc
+*.pyo
