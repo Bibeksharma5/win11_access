@@ -56,6 +56,23 @@ class TestGlobalPlugin(unittest.TestCase):
         self.assertEqual(len(called), 1)
         plugin.terminate()
 
+    def test_focusEntered_propagates_downstream_error_without_retrying(self):
+        plugin = GlobalPlugin()
+        self.addCleanup(plugin.terminate)
+        obj = SimpleNamespace(appModule=SimpleNamespace(appName="unigram"))
+        error = RuntimeError("downstream focus handler failed")
+        calls = []
+
+        def nextHandler():
+            calls.append(True)
+            raise error
+
+        with self.assertRaises(RuntimeError) as raised:
+            plugin.event_focusEntered(obj, nextHandler)
+
+        self.assertIs(raised.exception, error)
+        self.assertEqual(len(calls), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
