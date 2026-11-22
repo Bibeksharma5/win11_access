@@ -64,8 +64,4 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         Suppresses repetitive 'context menu list' announcements when navigating
         Windows Search result context menu with Up/Down arrows.
         """
-        try:
-            search_context_menu.handleFocusEntered(obj, nextHandler)
-        except Exception as e:
-            log.error(f"win11_access: Error in event_focusEntered: {e}")
-            nextHandler()
+        search_context_menu.handleFocusEntered(obj, nextHandler)
